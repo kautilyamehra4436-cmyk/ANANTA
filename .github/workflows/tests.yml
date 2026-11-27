@@ -13,13 +13,19 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - name: Install package and test dependency
         run: python -m pip install -e ".[dev]"
+      - name: Compile package
+        run: python -m compileall -q src
       - name: Run regression tests
         run: pytest -q
       - name: Run smoke test
