@@ -111,11 +111,11 @@ class BUDDHI:
 
 class AHAMKARA:
     name = "AHAMKARA"
-    identity = {"system": "ANANTA", "version": "0.3.0", "consciousness_claim": False}
+    identity = {"system": "ANANTA", "version": "0.4.0", "consciousness_claim": False}
 
     @staticmethod
     def boundaries() -> dict:
-        return {"can_execute_external_actions": False, "requires_yantra_gate": True}
+        return {"can_execute_local_actions": True, "local_actions": ["safe_calculation", "local_report"], "can_execute_external_actions": False, "requires_yantra_gate": True}
 
 
 class PRAMANA:

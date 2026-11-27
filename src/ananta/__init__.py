@@ -2,6 +2,10 @@
 from .controller import AnantaController
 from .models import Claim, Evidence, TaskRequest, ToolAction
 from .audit import AuditLedger
+from .execution import SandboxedExecutor, SafeCalculationError
 
-__all__ = ["AnantaController", "Claim", "Evidence", "TaskRequest", "ToolAction", "AuditLedger"]
-__version__ = "0.3.0"
+__all__ = [
+    "AnantaController", "Claim", "Evidence", "TaskRequest", "ToolAction",
+    "AuditLedger", "SandboxedExecutor", "SafeCalculationError",
+]
+__version__ = "0.4.0"

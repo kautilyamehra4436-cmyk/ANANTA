@@ -1,15 +1,17 @@
-"""Central controller with optional durable, tamper-evident audit storage."""
+"""Central controller with optional durable audit and sandboxed low-risk execution."""
 from copy import deepcopy
 from .audit import AuditLedger
+from .execution import SandboxedExecutor
 from .models import Claim, TaskRequest, ToolAction
 from .modules import AHAMKARA, BUDDHI, MANAS, PRAMANA, RITA, SAKSHI, VAK, YANTRA
 
 
 class AnantaController:
-    def __init__(self, audit_db_path: str | None = None):
+    def __init__(self, audit_db_path: str | None = None, workspace_dir: str | None = None):
         self.audit_log = []
         self.ledger = AuditLedger(audit_db_path) if audit_db_path else None
         self.emergency_stop = False
+        self.executor = SandboxedExecutor(workspace_dir=workspace_dir)
 
     def _record(self, event: str, **details):
         safe_details = deepcopy(details)
@@ -58,6 +60,17 @@ class AnantaController:
         decision = YANTRA.authorize(action, emergency_stop=self.emergency_stop)
         self._record("tool_action_decision", action=action.name, **decision)
         return decision
+
+    def execute_action(self, action: ToolAction) -> dict:
+        """Execute only implemented low-risk adapters after YANTRA authorization."""
+        result = self.executor.execute(action, emergency_stop=self.emergency_stop)
+        self._record(
+            "tool_action_execution",
+            action=action.name,
+            executed=bool(result.get("executed")),
+            reason=result.get("decision", {}).get("reason") if isinstance(result.get("decision"), dict) else result.get("error"),
+        )
+        return result
 
     def set_emergency_stop(self, enabled: bool, *, owner_confirmed: bool = False) -> dict:
         if type(enabled) is not bool or type(owner_confirmed) is not bool:
