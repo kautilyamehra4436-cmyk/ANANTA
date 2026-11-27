@@ -9,7 +9,11 @@ def main():
         TaskRequest("ANANTA core smoke test", task_id="smoke-001"),
         [Claim("The system does not claim consciousness.")],
     )
-    print(result)
+    assert result["answer_status"] == "REVIEW_REQUIRED"
+    assert result["review"]["unsupported_claims"] == [
+        "The system does not claim consciousness."
+    ]
+    print({"smoke_test": "passed", "unsupported_claim_guard": "passed"})
     print({"audit_events": len(engine.audit())})
 
 
