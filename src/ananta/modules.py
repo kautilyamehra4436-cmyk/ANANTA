@@ -128,7 +128,7 @@ class BUDDHI:
 
 class AHAMKARA:
     name = "AHAMKARA"
-    identity = {"system": "ANANTA", "version": "0.4.0", "consciousness_claim": False}
+    identity = {"system": "ANANTA", "version": "0.4.1", "consciousness_claim": False}
 
     @staticmethod
     def boundaries() -> dict:
