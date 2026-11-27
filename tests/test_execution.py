@@ -63,3 +63,23 @@ def test_read_file_is_not_yet_executable_even_if_authorized():
     )
     assert result["executed"] is False
     assert result["decision"]["reason"] == "execution_adapter_not_implemented"
+
+
+def test_controller_executes_and_audits_safe_calculation():
+    from ananta import AnantaController
+
+    engine = AnantaController()
+    result = engine.execute_action(ToolAction("safe_calculation", {"expression": "6 * 7"}))
+    assert result == {"executed": True, "action": "safe_calculation", "result": 42}
+    assert engine.audit()[-1]["event"] == "tool_action_execution"
+    assert engine.audit()[-1]["details"]["executed"] is True
+
+
+def test_controller_emergency_stop_blocks_execution():
+    from ananta import AnantaController
+
+    engine = AnantaController()
+    engine.set_emergency_stop(True, owner_confirmed=True)
+    result = engine.execute_action(ToolAction("safe_calculation", {"expression": "6 * 7"}))
+    assert result["executed"] is False
+    assert result["decision"]["reason"] == "emergency_stop_active"
