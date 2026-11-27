@@ -1,17 +1,35 @@
-"""Central controller with an append-only in-memory audit trail."""
-from .models import AuditEvent, Claim, TaskRequest, ToolAction
+"""Central controller with optional durable, tamper-evident audit storage."""
+from copy import deepcopy
+from .audit import AuditLedger
+from .models import Claim, TaskRequest, ToolAction
 from .modules import AHAMKARA, BUDDHI, MANAS, PRAMANA, RITA, SAKSHI, VAK, YANTRA
 
 
 class AnantaController:
-    def __init__(self):
-        self.audit_log: list[AuditEvent] = []
+    def __init__(self, audit_db_path: str | None = None):
+        self.audit_log = []
+        self.ledger = AuditLedger(audit_db_path) if audit_db_path else None
+        self.emergency_stop = False
 
     def _record(self, event: str, **details):
-        self.audit_log.append(AuditEvent(event, details))
+        safe_details = deepcopy(details)
+        if self.ledger:
+            stored = self.ledger.append(event, safe_details)
+            self.audit_log.append(stored)
+        else:
+            from datetime import datetime, timezone
+            from uuid import uuid4
+            self.audit_log.append({
+                "event": event, "details": safe_details,
+                "event_id": str(uuid4()),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
 
     def process(self, request: TaskRequest, claims: list[Claim] | None = None) -> dict:
-        claims = claims or []
+        if claims is None:
+            claims = []
+        if not isinstance(claims, list) or any(not isinstance(c, Claim) for c in claims):
+            raise TypeError("claims must be a list of Claim objects")
         parsed = VAK.parse(request)
         self._record("input_parsed", task_id=request.task_id, language=parsed["language"])
         focused = MANAS.focus(parsed)
@@ -23,7 +41,7 @@ class AnantaController:
             "review": ["check evidence"], "respond": ["review"]
         })
         result = {
-            "system": AHAMKARA.identity,
+            "system": deepcopy(AHAMKARA.identity),
             "capabilities": AHAMKARA.boundaries(),
             "task_id": request.task_id,
             "plan": plan,
@@ -37,9 +55,30 @@ class AnantaController:
         return result
 
     def authorize_action(self, action: ToolAction) -> dict:
-        decision = YANTRA.authorize(action)
+        decision = YANTRA.authorize(action, emergency_stop=self.emergency_stop)
         self._record("tool_action_decision", action=action.name, **decision)
         return decision
 
+    def set_emergency_stop(self, enabled: bool, *, owner_confirmed: bool = False) -> dict:
+        if type(enabled) is not bool or type(owner_confirmed) is not bool:
+            raise TypeError("enabled and owner_confirmed must be booleans")
+        if not owner_confirmed:
+            return {"changed": False, "reason": "owner_confirmation_required"}
+        self.emergency_stop = enabled
+        self._record("emergency_stop_changed", enabled=enabled)
+        return {"changed": True, "enabled": enabled}
+
     def audit(self) -> list[dict]:
-        return [{"event": event.event, "details": event.details} for event in self.audit_log]
+        if self.ledger:
+            return self.ledger.read_all()
+        return deepcopy(self.audit_log)
+
+    def verify_audit(self) -> dict:
+        if not self.ledger:
+            return {"verified": True, "mode": "ephemeral", "events": len(self.audit_log),
+                    "note": "In-memory records are not durable across process restarts."}
+        return self.ledger.verify()
+
+    def close(self):
+        if self.ledger:
+            self.ledger.close()

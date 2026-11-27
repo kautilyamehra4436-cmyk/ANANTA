@@ -68,4 +68,4 @@ def test_unapproved_read_file_denied():
 
 
 def test_safe_calculation_allowlisted():
-    assert YANTRA.authorize(ToolAction("safe_calculation"))["authorized"] is True
+    assert YANTRA.authorize(ToolAction("safe_calculation", payload={"expression": "2 + 2"}))["authorized"] is True

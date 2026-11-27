@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ananta-core"
-version = "0.2.0"
-description = "PRIMORDIAL-inspired modular AI control and evidence framework"
+version = "0.3.0"
+description = "Modular AI control, evidence, and audit framework"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 dependencies = []
 
 [project.optional-dependencies]
