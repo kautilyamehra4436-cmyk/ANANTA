@@ -1,6 +1,6 @@
 # ANANTA — Modular AI Control and Evidence Framework
 
-**स्थिति:** executable software foundation v0.4.0  
+**स्थिति:** executable software foundation v0.4.1  
 **PRIMORDIAL** = शोध/डिजाइन दर्शन; **ANANTA** = उस पर आधारित AI system। यह deterministic control framework है; subjective consciousness का दावा नहीं करता।
 
 ## आठ मूल modules
@@ -15,8 +15,8 @@
 
 ## v0.4.0 capability enablement
 - Added a sandboxed executor for bounded arithmetic expressions and local Markdown report creation.
-- Arithmetic uses a restricted Python AST interpreter; it does not call eval/exec, import modules, access files, or invoke a shell.
-- Local reports are written only under the explicitly configured workspace's reports directory.
+- Arithmetic uses a restricted Python AST interpreter with bounded integer/float values and expression complexity; it does not call eval/exec, import modules, access files, or invoke a shell.
+- Local reports are written only under the explicitly configured workspace's reports directory, using unique temporary files and atomic replacement.
 - Controller execution outcomes are recorded in the audit log.
 - Unknown actions remain denied. The read_file action is not yet executable.
 

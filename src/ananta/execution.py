@@ -4,7 +4,9 @@ from __future__ import annotations
 import ast
 import math
 import operator
+import os
 import re
+import tempfile
 from pathlib import Path
 
 from .models import ToolAction
@@ -18,6 +20,8 @@ class SafeCalculationError(ValueError):
 class SandboxedExecutor:
     """Execute allowlisted actions; never invokes a shell or arbitrary Python."""
 
+    MAX_INTEGER_BITS = 256
+    MAX_FLOAT_MAGNITUDE = 1e100
     _BINARY = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
@@ -33,28 +37,35 @@ class SandboxedExecutor:
         self.workspace = Path(workspace_dir).resolve() if workspace_dir is not None else None
 
     @classmethod
+    def _validate_number(cls, value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise SafeCalculationError("only_finite_numeric_values_allowed")
+        if isinstance(value, int) and value.bit_length() > cls.MAX_INTEGER_BITS:
+            raise SafeCalculationError("integer_result_too_large")
+        if isinstance(value, float) and (
+            not math.isfinite(value) or abs(value) > cls.MAX_FLOAT_MAGNITUDE
+        ):
+            raise SafeCalculationError("numeric_result_out_of_range")
+        return value
+
+    @classmethod
     def _calculate_node(cls, node: ast.AST, depth: int = 0):
         if depth > 24:
             raise SafeCalculationError("expression_too_complex")
         if isinstance(node, ast.Constant):
-            value = node.value
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise SafeCalculationError("only_numeric_constants_allowed")
-            return value
+            return cls._validate_number(node.value)
         if isinstance(node, ast.UnaryOp) and type(node.op) in cls._UNARY:
-            return cls._UNARY[type(node.op)](cls._calculate_node(node.operand, depth + 1))
+            value = cls._calculate_node(node.operand, depth + 1)
+            return cls._validate_number(cls._UNARY[type(node.op)](value))
         if isinstance(node, ast.BinOp) and type(node.op) in cls._BINARY:
             left = cls._calculate_node(node.left, depth + 1)
             right = cls._calculate_node(node.right, depth + 1)
-            if isinstance(node.op, ast.Pow) and (abs(right) > 12 or abs(left) > 1_000_000):
+            if isinstance(node.op, ast.Pow) and (
+                abs(right) > 12 or abs(left) > 1_000_000
+            ):
                 raise SafeCalculationError("exponent_or_base_limit_exceeded")
             result = cls._BINARY[type(node.op)](left, right)
-            if isinstance(result, (int, float)):
-                if isinstance(result, int) and result.bit_length() > 256:
-                    raise SafeCalculationError("integer_result_too_large")
-                if isinstance(result, float) and (not math.isfinite(result) or abs(result) > 1e100):
-                    raise SafeCalculationError("numeric_result_out_of_range")
-            return result
+            return cls._validate_number(result)
         raise SafeCalculationError("unsupported_expression_syntax")
 
     @classmethod
@@ -68,7 +79,7 @@ class SandboxedExecutor:
             return cls._calculate_node(tree.body)
         except SafeCalculationError:
             raise
-        except (SyntaxError, ArithmeticError, OverflowError, TypeError, ValueError) as exc:
+        except (SyntaxError, ArithmeticError, OverflowError, TypeError, ValueError, RecursionError) as exc:
             raise SafeCalculationError("calculation_failed") from exc
 
     def _write_report(self, title: str, content: str) -> dict:
@@ -81,12 +92,26 @@ class SandboxedExecutor:
         if self.workspace not in report_dir.parents:
             raise ValueError("report_path_outside_workspace")
         report_dir.mkdir(parents=True, exist_ok=True)
-        destination = (report_dir / f"{slug}.md").resolve()
-        if report_dir not in destination.parents:
+
+        # Keep the destination lexical: os.replace replaces a destination symlink
+        # itself rather than following it. The unique temporary file is created
+        # atomically inside the already-resolved reports directory.
+        destination = report_dir / f"{slug}.md"
+        if destination.parent != report_dir:
             raise ValueError("report_path_outside_workspace")
-        temporary = destination.with_suffix(".md.tmp")
-        temporary.write_text(f"# {title.strip()}\n\n{content}", encoding="utf-8")
-        temporary.replace(destination)
+        fd, temporary_name = tempfile.mkstemp(prefix=".ananta-report-", suffix=".tmp", dir=report_dir)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(f"# {title.strip()}\n\n{content}")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, destination)
+        except Exception:
+            try:
+                os.unlink(temporary_name)
+            except FileNotFoundError:
+                pass
+            raise
         return {"executed": True, "action": "local_report", "path": str(destination.relative_to(self.workspace))}
 
     def execute(self, action: ToolAction, *, emergency_stop: bool = False) -> dict:

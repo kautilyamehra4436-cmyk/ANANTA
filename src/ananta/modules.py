@@ -1,4 +1,6 @@
 """Deterministic implementations of ANANTA's eight control modules."""
+import heapq
+
 from .models import Claim, EvidenceGrade, TaskRequest, ToolAction
 
 
@@ -18,14 +20,19 @@ class RITA:
             if not isinstance(prerequisites, list):
                 errors.append(f"invalid-prerequisites:{task}")
                 continue
-            normalized[task] = prerequisites
-            if task in prerequisites:
-                errors.append(f"self-dependency:{task}")
+            valid_prerequisites = []
             for prerequisite in prerequisites:
+                if not isinstance(prerequisite, str) or not prerequisite:
+                    errors.append(f"invalid-prerequisite:{task}")
+                    continue
+                valid_prerequisites.append(prerequisite)
+                if prerequisite == task:
+                    errors.append(f"self-dependency:{task}")
                 if prerequisite not in dependencies:
                     errors.append(f"unknown-dependency:{task}->{prerequisite}")
+            normalized[task] = valid_prerequisites
 
-        # Iterative color DFS avoids Python recursion-depth failures on long graphs.
+        # Iterative color DFS avoids recursion-depth failures on long graphs.
         color = {node: 0 for node in normalized}
         for root in normalized:
             if color[root]:
@@ -55,19 +62,29 @@ class RITA:
         errors = RITA.check_dependencies(dependencies)
         if errors:
             raise ValueError("invalid dependency graph: " + ", ".join(errors))
-        remaining = {node: set(reqs) for node, reqs in dependencies.items()}
-        ready = sorted(node for node, reqs in remaining.items() if not reqs)
+
+        # Kahn's algorithm with a min-heap: deterministic O((V + E) log V)
+        # ordering, without repeatedly scanning and sorting every remaining node.
+        prerequisites = {node: set(reqs) for node, reqs in dependencies.items()}
+        dependents = {node: [] for node in dependencies}
+        indegree = {node: len(reqs) for node, reqs in prerequisites.items()}
+        for node, reqs in prerequisites.items():
+            for prerequisite in reqs:
+                dependents[prerequisite].append(node)
+        for children in dependents.values():
+            children.sort()
+
+        ready = [node for node, degree in indegree.items() if degree == 0]
+        heapq.heapify(ready)
         ordered = []
         while ready:
-            node = ready.pop(0)
+            node = heapq.heappop(ready)
             ordered.append(node)
-            for other in sorted(remaining):
-                if node in remaining[other]:
-                    remaining[other].remove(node)
-                    if not remaining[other] and other not in ordered and other not in ready:
-                        ready.append(other)
-            ready.sort()
-        if len(ordered) != len(remaining):
+            for child in dependents[node]:
+                indegree[child] -= 1
+                if indegree[child] == 0:
+                    heapq.heappush(ready, child)
+        if len(ordered) != len(dependencies):
             raise ValueError("dependency graph contains a cycle")
         return ordered
 
@@ -111,7 +128,7 @@ class BUDDHI:
 
 class AHAMKARA:
     name = "AHAMKARA"
-    identity = {"system": "ANANTA", "version": "0.4.0", "consciousness_claim": False}
+    identity = {"system": "ANANTA", "version": "0.4.1", "consciousness_claim": False}
 
     @staticmethod
     def boundaries() -> dict:
