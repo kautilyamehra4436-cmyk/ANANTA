@@ -1,11 +1,11 @@
-# ANANTA Architecture — executable foundation v0.4.0
+# ANANTA Architecture — executable foundation v0.4.1
 
 ## Source alignment
 This foundation preserves the eight named modules, central controller, evidence grades A–E, staged workflow, deny-by-default action policy, and no unsupported claim of subjective consciousness.
 
 ## Runtime flow
 `TaskRequest → VAK → MANAS → BUDDHI → PRAMANA → RITA → SAKSHI → Controller result`
-AHAMKARA supplies identity/capability boundaries. YANTRA authorizes allowlisted actions. The new `SandboxedExecutor` implements only bounded arithmetic and workspace-confined local report creation. No LLM is integrated.
+AHAMKARA supplies identity/capability boundaries. YANTRA authorizes allowlisted actions. The `SandboxedExecutor` implements bounded arithmetic (256-bit integer and finite float limits) and workspace-confined local report creation using unique temporary files and atomic replacement. No LLM is integrated.
 
 ## Module contracts
 - VAK validates the request object, non-empty text, maximum length, task identifier and language metadata; it does not translate.
