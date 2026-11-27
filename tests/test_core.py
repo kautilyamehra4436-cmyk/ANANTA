@@ -6,9 +6,20 @@ from ananta.modules import PRAMANA, RITA, YANTRA
 def test_basic_task_pipeline_and_audit():
     engine = AnantaController()
     result = engine.process(TaskRequest("test input", "t-1"))
+    assert result["answer_status"] == "READY_FOR_RESPONSE"
+    assert result["review"]["passed"] is True
+    assert len(engine.audit()) == 2
+
+
+def test_unsupported_claim_requires_review():
+    engine = AnantaController()
+    result = engine.process(
+        TaskRequest("check an unsupported claim", "t-2"),
+        [Claim("unsupported statement")],
+    )
     assert result["answer_status"] == "REVIEW_REQUIRED"
     assert result["review"]["passed"] is False
-    assert len(engine.audit()) == 2
+    assert result["evidence"][0]["status"] == "UNVERIFIED"
 
 
 def test_empty_input_rejected():
