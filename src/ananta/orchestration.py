@@ -34,8 +34,8 @@ class ANANTAOrchestrator:
         artifacts = {}
         steps = {
             "parse_input": lambda: VAK.parse(request),
-            "focus": lambda: MANAS.focus(artifacts["parsed"]),
-            "plan": lambda: BUDDHI.plan(artifacts["focused"]),
+            "focus": lambda: MANAS.focus(artifacts["parse_input"]),
+            "plan": lambda: BUDDHI.plan(artifacts["focus"]),
             "assess_evidence": lambda: [PRAMANA.assess(claim) for claim in claims],
             "review_claims": lambda: SAKSHI.review(claims),
             "validate_flow": lambda: RITA.check_dependencies(cls.DEPENDENCIES),
