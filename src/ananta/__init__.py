@@ -8,4 +8,4 @@ __all__ = [
     "AnantaController", "Claim", "Evidence", "TaskRequest", "ToolAction",
     "AuditLedger", "SandboxedExecutor", "SafeCalculationError",
 ]
-__version__ = "0.4.0"
+__version__ = "0.4.2"
